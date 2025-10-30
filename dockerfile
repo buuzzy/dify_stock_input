@@ -50,7 +50,6 @@ ENV PYTHONUNBUFFERED=1
 # 暴露端口 (主要用于文档目的，Cloud Run 会覆盖它)
 EXPOSE 8080
 
-# 【Cloud Run 关键修复】
 # 启动 uvicorn 生产服务器
 # 1. 'server:app': 指向 server.py 文件中的 'app' FastAPI 实例
 # 2. '--host 0.0.0.0': 监听所有网络接口 (Cloud Run 要求)
