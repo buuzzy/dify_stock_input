@@ -10,7 +10,8 @@ from fastapi import FastAPI
 from supabase import create_client, Client
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
-from starlette.responses import Response # <--- 1. 添加此导入
+# 【修复1】移除不再需要的 Response 导入
+# from starlette.responses import Response 
 from mcp.server.sse import SseServerTransport
 
 # --- 1. 日志配置 ---
@@ -66,8 +67,7 @@ mcp = FastMCP("Stock Filter Tool")
 # --- 4. MCP 工具定义 ---
 @mcp.tool()
 @supabase_tool_handler
-# 【真正修复】移除不必要的 *args 和 **kwargs，因为此工具不接收参数
-def get_strong_sentiment_low_pe_stocks() -> str: # <--- 正确的签名
+def get_strong_sentiment_low_pe_stocks() -> str:
     """
     查询并返回符合以下条件的股票代码列表:
     1. 市场情绪为强烈看涨 (is_strong_sentiment = true)
@@ -82,7 +82,6 @@ def get_strong_sentiment_low_pe_stocks() -> str: # <--- 正确的签名
     if not response.data:
         return "未找到符合条件的股票。"
 
-    # 【修复】使用类型安全的循环来处理返回数据，避免 Pylance 报错
     stock_codes: list[str] = []
     for item in response.data:
         if isinstance(item, dict):
@@ -93,7 +92,6 @@ def get_strong_sentiment_low_pe_stocks() -> str: # <--- 正确的签名
     if not stock_codes:
         return "查询到数据但无法提取有效的股票代码。"
         
-    # 此处 stock_codes 保证是 list[str]，可以安全地 join
     return f"查询成功，找到 {len(stock_codes)} 个符合条件的股票: {', '.join(stock_codes)}"
 
 @app.get("/")
@@ -101,22 +99,27 @@ async def health_check() -> Dict[str, str]:
     """健康检查端点"""
     return {"status": "healthy"}
 
-# --- 5. MCP SSE 集成 ---
+# --- 5. MCP SSE 集成 (关键修复) ---
 MCP_BASE_PATH = "/sse"
 try:
     messages_full_path = f"{MCP_BASE_PATH}/messages/"
     sse_transport = SseServerTransport(messages_full_path)
 
-    # 2. 修改函数签名和实现
-    async def handle_mcp_sse_handshake(request: Request) -> Response:
+    # 【修复2】函数签名必须返回 -> None
+    # SseServerTransport 会接管响应流，函数本身不应返回任何值。
+    async def handle_mcp_sse_handshake(request: Request) -> None:
+        """
+        处理 MCP 的 SSE 握手。
+        """
         async with sse_transport.connect_sse(
             request.scope, request.receive, request._send
         ) as (read_stream, write_stream):
             await mcp._mcp_server.run(
                 read_stream, write_stream, mcp._mcp_server.create_initialization_options()
             )
-        # 3. 添加返回值以满足 Starlette 框架要求
-        return Response(status_code=200)
+        # 【修复3】移除 "return Response(status_code=200)"
+        # 这一行是导致 "Invalid content type" 错误的根源。
+        # return Response(status_code=200) # <--- 已删除
 
     @mcp.prompt()
     def usage_guide() -> str:
@@ -125,8 +128,10 @@ try:
 直接调用 `get_strong_sentiment_low_pe_stocks()` 即可开始查询。
 """
 
-    # 4. 移除 # type: ignore (现在不再需要)
-    app.add_route(MCP_BASE_PATH, handle_mcp_sse_handshake, methods=["GET"])
+    # 【修复4】添加 # type: ignore
+    # 告诉 Starlette/FastAPI 框架，我们知道这个路由不返回标准 Response，
+    # 这是符合预期的，请不要报错。
+    app.add_route(MCP_BASE_PATH, handle_mcp_sse_handshake, methods=["GET"])  # type: ignore
     app.mount(messages_full_path, sse_transport.handle_post_message)
     logging.info("MCP SSE 集成设置完成")
 
