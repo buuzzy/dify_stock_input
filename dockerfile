@@ -54,6 +54,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 # 暴露端口
 EXPOSE ${PORT} 
 
-# 【关键修复】
 # 启动命令：必须使用 $PORT 环境变量，而不是硬编码 8080
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "$PORT"]
