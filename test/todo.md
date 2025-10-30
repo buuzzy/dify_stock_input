@@ -6,5 +6,5 @@
 - [x] 使用固化版本的 `requirements.txt`
 - [x] 修复 `server.py` 中的类型安全问题和路由定义问题
 - [x] **[已修正]** 创建 `test_client.py`，使用 `httpx-sse` 进行可靠的本地测试
-- [ ] **成功完成本地测试**
-- [ ] 部署到 Cloud Run
+- [x] **成功完成本地测试**
+- [x] 部署到 Cloud Run
